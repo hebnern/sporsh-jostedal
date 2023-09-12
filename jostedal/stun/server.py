@@ -18,7 +18,7 @@ class StunUdpServer(StunUdpProtocol):
         logger.info("%s Sending response", self)
         logger.debug(response.format())
 
-    def _stun_binding_request(self, msg, (host, port)):
+    def _stun_binding_request(self, msg, addr):
         if msg.msg_class == stun.CLASS_REQUEST:
             unknown_attributes = msg.unknown_comp_required_attrs()
             if unknown_attributes:
@@ -28,6 +28,7 @@ class StunUdpServer(StunUdpProtocol):
                 response.add_attr(attributes.ErrorCode, *stun.ERR_UNKNOWN_ATTRIBUTE)
                 response.add_attr(attributes.UnknownAttributes, unknown_attributes)
             else:
+                host, port = addr
                 response = Message.encode(stun.METHOD_BINDING,
                                                stun.CLASS_RESPONSE_SUCCESS,
                                                transaction_id=msg.transaction_id)
