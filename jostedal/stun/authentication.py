@@ -18,7 +18,7 @@ class ShortTermCredentialMechanism(CredentialMechanism):
     """
     def __init__(self, username, password):
         self.username = username
-        self.hmac_key = saslprep(password)
+        self.hmac_key = saslprep(password).encode()
 
     def update(self, msg):
         msg.add_attr(attributes.Username, self.username)

@@ -50,7 +50,7 @@ class MessageIntegrity(Attribute):
         return cls(value)
 
     def __repr__(self):
-        return "MESSAGE-INTEGRITY({})".format(str.encode(self, 'hex'))
+        return "MESSAGE-INTEGRITY({})".format(self.hex())
 
 
 @attribute
@@ -65,14 +65,14 @@ class ErrorCode(Attribute):
         self.err_class = err_class
         self.err_number = err_number
         self.code = err_class * 100 + err_number
-        self.reason = str(reason).decode('utf8')
+        self.reason = bytes(reason).decode('utf8')
 
     @classmethod
     def decode(cls, data, offset, length):
         err_class, err_number = cls._struct.unpack_from(data, offset)
         err_class &= 0b111
-        value = buffer(data, offset, length)
-        reason = buffer(value, cls._struct.size)
+        value = memoryview(data)[offset:offset+length]
+        reason = memoryview(value)[cls._struct.size:]
         return cls(value, err_class, err_number, reason)
 
     @classmethod
@@ -98,7 +98,7 @@ class UnknownAttributes(Attribute):
     @classmethod
     def decode(cls, data, offset, length):
         types = struct.unpack_from('>{}H'.format(length // 2), data, offset)
-        return cls(buffer(data, offset, length), types)
+        return cls(memoryview(data)[offset:offset+length], types)
 
     @classmethod
     def encode(cls, msg, types):
@@ -122,7 +122,7 @@ class Realm(Attribute):
         return cls(realm.encode('utf8'))
 
     def __repr__(self):
-        return "REALM({})".format(str.__repr__(self))
+        return "REALM({})".format(bytes.__repr__(self))
 
 
 @attribute
@@ -134,7 +134,7 @@ class Nonce(Attribute):
     _max_length = 763 # less than 128 characters can be up to 763 bytes
 
     def __repr__(self):
-        return "NONCE({})".format(str.__repr__(self))
+        return "NONCE({})".format(bytes.__repr__(self))
 
 
 @attribute
@@ -158,7 +158,7 @@ class Software(Attribute):
         return cls(software.encode('utf8'))
 
     def __repr__(self):
-        return "SOFTWARE({})".format(str.__repr__(self))
+        return "SOFTWARE({})".format(bytes.__repr__(self))
 
 
 @attribute
@@ -189,7 +189,7 @@ class Fingerprint(Attribute):
     @classmethod
     def decode(cls, data, offset, length):
         fingerprint, = cls._struct.unpack_from(data, offset)
-        return cls(buffer(data, offset, length), fingerprint)
+        return cls(memoryview(data)[offset:offset+length], fingerprint)
 
     def __repr__(self, *args, **kwargs):
-        return "FINGERPRINT(0x{})".format(str.encode(self, 'hex'))
+        return "FINGERPRINT(0x{})".format(self.hex())

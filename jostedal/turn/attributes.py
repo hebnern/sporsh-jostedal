@@ -28,7 +28,7 @@ class Lifetime(Attribute):
     @classmethod
     def decode(cls, data, offset, length):
         lifetime, = cls._struct.unpack_from(data, offset)
-        return cls(buffer(data, offset, length), lifetime)
+        return cls(memoryview(data)[offset:offset+length], lifetime)
 
     @classmethod
     def encode(cls, msg, time_to_expiry):
@@ -98,7 +98,7 @@ class RequestedTransport(Attribute):
     @classmethod
     def decode(cls, data, offset, length):
         protocol, = cls._struct.unpack_from(data, offset)
-        return cls(buffer(data, offset, length), protocol)
+        return cls(memoryview(data)[offset:offset+length], protocol)
 
     def __repr__(self, *args, **kwargs):
         return "REQUESTED-TRANSPORT({:#02x})".format(self.protocol)
