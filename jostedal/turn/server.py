@@ -4,7 +4,50 @@ from jostedal.stun.attributes import ErrorCode, XorMappedAddress
 from jostedal.turn.attributes import XorRelayedAddress, ReservationToken, Lifetime
 from jostedal.stun.agent import Address
 from jostedal.turn.relay import Relay
+import struct
 
+class ChannelMessage(bytearray):
+    """TURN channel message structure
+    :see: http://tools.ietf.org/html/rfc5389#section-6
+    """
+
+    _struct = struct.Struct('>2H')
+
+    def __init__(self, data, channel_num):
+        bytearray.__init__(self, data)
+        self.channel_num = channel_num
+
+    @classmethod
+    def encode(cls, channel_num, data=''):
+        header = cls._struct.pack(channel_num, len(data))
+        message = cls(header, channel_num)
+        message.extend(data)
+        return message
+
+    @classmethod
+    def decode(cls, data):
+        """
+        :see: http://tools.ietf.org/html/rfc5389#section-7.3.1
+        """
+        assert data[0] >> 6 == turn.MSG_CHANNEL, \
+            "Channel message MUST start with 0b01"
+        channel_num, msg_length = cls._struct.unpack_from(data)
+        return cls(memoryview(data)[:cls._struct.size + msg_length], channel_num)
+
+    @property
+    def length(self):
+        return len(self) - self._struct.size
+
+    def __repr__(self):
+        return ("{}(length={}, channel_num={})".format(
+                    type(self).__name__, len(self) - self._struct.size, self.channel_num))
+
+    def format(self):
+        string = '\n'.join([
+            "{0.__class__.__name__}",
+            "    length:         {0.length}",
+            ]).format(self)
+        return string
 
 class TurnUdpServer(StunUdpServer):
     max_lifetime = 3600
@@ -176,7 +219,33 @@ class TurnUdpServer(StunUdpServer):
         """
         :see: http://tools.ietf.org/html/rfc5766#section-11.2
         """
-        raise NotImplementedError("ChannelBind request")
+        # 1. require request to be authenticated
+        message_integrity = msg.get_attr(stun.ATTR_MESSAGE_INTEGRITY)
+        if not message_integrity:
+            response = msg.create_response(stun.CLASS_RESPONSE_ERROR)
+            response.add_attr(ErrorCode, *stun.ERR_UNAUTHORIZED)
+            self.respond(response, addr)
+            return
+
+        # 2. require CHANNEL-NUMBER and XOR-PEER-ADDRESS attributes
+        # 3. require channel number is in valid range (0x4000 - 0x4FFF inclusive)
+        # 4. require channel number is not currently bound to a different transport address (same transport address is OK)
+        # 5. require transport address is not currently bound to a different channel number
+
+        relay = self._relays[addr]
+        peer_addr = msg.get_attr(turn.ATTR_XOR_PEER_ADDRESS)
+        channel_num = msg.get_attr(turn.ATTR_CHANNEL_NUMBER)
+        relay.bind_channel(channel_num, peer_addr)
+        response = msg.create_response(stun.CLASS_RESPONSE_SUCCESS)
+        self.respond(response, addr)
+
+    def _stun_unhandled_datagram(self, datagram, addr):
+        msg_type = datagram[0] >> 6
+        if msg_type == turn.MSG_CHANNEL:
+            msg = ChannelMessage.decode(datagram)
+            print(repr(msg))
+        else:
+            super()._stun_unhandled_datagram(datagram, addr)
 
     def __str__(self):
         return ("interface={0.interface}, port={0.port}, "
