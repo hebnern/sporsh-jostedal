@@ -7,7 +7,6 @@ from jostedal.turn import attributes
 
 logger = logging.getLogger(__name__)
 
-
 class Relay(DatagramProtocol):
     relay_addr = (None, None, None)
 
@@ -37,6 +36,12 @@ class Relay(DatagramProtocol):
     def add_permission(self, peer_addr):
         logger.info("%s Added permission for %s", self, peer_addr)
         self.permissions.append(peer_addr)
+
+    def bind_channel(self, channel_num, peer_addr):
+        if peer_addr.address not in self.permissions:
+            self.add_permission(peer_addr.address)
+        if peer_addr.address not in self._channels:
+            self._channels[peer_addr.address] = channel_num
 
     def send(self, data, addr):
         logger.info("%s -> %s:%d", self, *addr)
