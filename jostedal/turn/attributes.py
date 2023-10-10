@@ -11,6 +11,9 @@ class ChannelNumber(Attribute):
     type = turn.ATTR_CHANNEL_NUMBER
     _struct = struct.Struct('>H2x')
 
+    def __init__(self, data, channel_num):
+        self.channel_num = channel_num
+
     @classmethod
     def decode(cls, data, offset, length):
         channel_num, = cls._struct.unpack_from(data, offset)

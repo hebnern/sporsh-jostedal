@@ -3,51 +3,7 @@ from jostedal import turn, stun
 from jostedal.stun.attributes import ErrorCode, XorMappedAddress
 from jostedal.turn.attributes import XorRelayedAddress, ReservationToken, Lifetime
 from jostedal.stun.agent import Address
-from jostedal.turn.relay import Relay
-import struct
-
-class ChannelMessage(bytearray):
-    """TURN channel message structure
-    :see: http://tools.ietf.org/html/rfc5389#section-6
-    """
-
-    _struct = struct.Struct('>2H')
-
-    def __init__(self, data, channel_num):
-        bytearray.__init__(self, data)
-        self.channel_num = channel_num
-
-    @classmethod
-    def encode(cls, channel_num, data=''):
-        header = cls._struct.pack(channel_num, len(data))
-        message = cls(header, channel_num)
-        message.extend(data)
-        return message
-
-    @classmethod
-    def decode(cls, data):
-        """
-        :see: http://tools.ietf.org/html/rfc5389#section-7.3.1
-        """
-        assert data[0] >> 6 == turn.MSG_CHANNEL, \
-            "Channel message MUST start with 0b01"
-        channel_num, msg_length = cls._struct.unpack_from(data)
-        return cls(memoryview(data)[:cls._struct.size + msg_length], channel_num)
-
-    @property
-    def length(self):
-        return len(self) - self._struct.size
-
-    def __repr__(self):
-        return ("{}(length={}, channel_num={})".format(
-                    type(self).__name__, len(self) - self._struct.size, self.channel_num))
-
-    def format(self):
-        string = '\n'.join([
-            "{0.__class__.__name__}",
-            "    length:         {0.length}",
-            ]).format(self)
-        return string
+from jostedal.turn.relay import Relay, ChannelMessage
 
 class TurnUdpServer(StunUdpServer):
     max_lifetime = 3600
@@ -235,7 +191,7 @@ class TurnUdpServer(StunUdpServer):
         relay = self._relays[addr]
         peer_addr = msg.get_attr(turn.ATTR_XOR_PEER_ADDRESS)
         channel_num = msg.get_attr(turn.ATTR_CHANNEL_NUMBER)
-        relay.bind_channel(channel_num, peer_addr)
+        relay.bind_channel(channel_num.channel_num, peer_addr)
         response = msg.create_response(stun.CLASS_RESPONSE_SUCCESS)
         self.respond(response, addr)
 
@@ -243,7 +199,8 @@ class TurnUdpServer(StunUdpServer):
         msg_type = datagram[0] >> 6
         if msg_type == turn.MSG_CHANNEL:
             msg = ChannelMessage.decode(datagram)
-            print(repr(msg))
+            relay = self._relays[addr]
+            relay.send_channel(msg.channel_num, memoryview(msg)[4:])
         else:
             super()._stun_unhandled_datagram(datagram, addr)
 
