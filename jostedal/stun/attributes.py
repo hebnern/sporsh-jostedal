@@ -119,7 +119,7 @@ class Realm(Attribute):
 
     @classmethod
     def encode(cls, msg, realm):
-        return cls(realm.encode('utf8'))
+        return cls(realm)
 
     def __repr__(self):
         return "REALM({})".format(bytes.__repr__(self))

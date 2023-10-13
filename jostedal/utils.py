@@ -6,4 +6,5 @@ def saslprep(string):
     return string
 
 def ha1(username, realm, password):
-    return hashlib.md5(':'.join((username, realm, saslprep(password)))).digest()
+    print(username, realm, password)
+    return hashlib.md5(':'.join((username, realm, saslprep(password))).encode()).digest()
